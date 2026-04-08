@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { AnalysisData } from "../types";
 import { GoogleGenAI } from "@google/genai";
-import { BookOpen, Sparkles, Loader2 } from "lucide-react";
+import { BookOpen, Sparkles, Loader2, History } from "lucide-react";
 import { motion } from "motion/react";
 
 interface ProjectStoryProps {
@@ -15,7 +15,7 @@ export function ProjectStory({ data }: ProjectStoryProps) {
   useEffect(() => {
     const generateStory = async () => {
       try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
         const prompt = `Analyze this GitHub repository data for "${data.name}":
         - Description: ${data.description}
         - Features added: ${data.commitClassification.features}
@@ -43,29 +43,36 @@ export function ProjectStory({ data }: ProjectStoryProps) {
   }, [data]);
 
   return (
-    <div className="p-6 rounded-2xl border border-white/10 bg-white/[0.02] space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-orange-500 font-bold uppercase tracking-widest text-xs">
-          <BookOpen className="w-4 h-4" />
-          Project Story
+    <div className="glass rounded-[32px] p-10 space-y-8 relative overflow-hidden group">
+      <div className="flex items-center justify-between relative z-10">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-insights/10 border border-insights/20 flex items-center justify-center">
+            <History className="w-6 h-6 text-insights" />
+          </div>
+          <div>
+            <h3 className="text-xl font-display font-bold tracking-tight text-text-primary">Project Evolution</h3>
+            <p className="text-text-secondary text-sm">The narrative journey of this codebase</p>
+          </div>
         </div>
-        <Sparkles className="w-4 h-4 text-orange-500/50" />
+        <Sparkles className="w-5 h-5 text-insights animate-pulse" />
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-3 text-white/40 py-8">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          <span className="text-sm italic">AI is drafting the narrative...</span>
+        <div className="flex flex-col items-center justify-center py-16 gap-4 text-text-secondary/40 relative z-10">
+          <Loader2 className="w-8 h-8 animate-spin text-insights" />
+          <span className="text-sm font-mono uppercase tracking-widest">Drafting the story...</span>
         </div>
       ) : (
         <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="prose prose-invert prose-sm max-w-none text-white/70 leading-relaxed"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative z-10"
         >
-          {story.split('\n').map((line, i) => (
-            <p key={i}>{line}</p>
-          ))}
+          <div className="bg-bg/40 border border-border rounded-3xl p-8 text-text-secondary leading-relaxed text-base">
+            {story.split('\n').map((line, i) => (
+              <p key={i} className="mb-4 last:mb-0">{line}</p>
+            ))}
+          </div>
         </motion.div>
       )}
     </div>

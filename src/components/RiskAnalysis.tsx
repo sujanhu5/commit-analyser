@@ -1,5 +1,5 @@
-import { AlertTriangle, FileCode } from "lucide-react";
-import { cn } from "../lib/utils";
+import { AlertTriangle, FileCode, TrendingUp } from "lucide-react";
+import { motion } from "motion/react";
 
 interface RiskAnalysisProps {
   riskyFiles: Record<string, { churn: number; changes: number }>;
@@ -11,42 +11,79 @@ export function RiskAnalysis({ riskyFiles }: RiskAnalysisProps) {
     .slice(0, 5);
 
   const getRiskLevel = (churn: number) => {
-    if (churn > 500) return { label: "High", color: "text-red-500", bg: "bg-red-500/10" };
-    if (churn > 100) return { label: "Medium", color: "text-yellow-500", bg: "bg-yellow-500/10" };
-    return { label: "Low", color: "text-green-500", bg: "bg-green-500/10" };
+    if (churn > 500) return { label: "Critical", color: "text-danger", bg: "bg-danger/10", border: "border-danger/20" };
+    if (churn > 100) return { label: "High", color: "text-warning", bg: "bg-warning/10", border: "border-warning/20" };
+    return { label: "Moderate", color: "text-success", bg: "bg-success/10", border: "border-success/20" };
   };
 
   return (
-    <div className="p-6 rounded-2xl border border-white/10 bg-white/[0.02] space-y-6">
-      <div className="flex items-center gap-2 text-orange-500 font-bold uppercase tracking-widest text-xs">
-        <AlertTriangle className="w-4 h-4" />
-        Risk Analysis
+    <div className="glass rounded-[32px] p-10 space-y-10">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-warning/10 border border-warning/20 flex items-center justify-center">
+            <AlertTriangle className="w-6 h-6 text-warning" />
+          </div>
+          <div>
+            <h3 className="text-xl font-display font-bold tracking-tight text-text-primary">Architectural Risk</h3>
+            <p className="text-text-secondary text-sm">High-churn files and potential bottlenecks</p>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-4">
         {sortedFiles.length > 0 ? (
-          sortedFiles.map(([filename, stats]) => {
+          sortedFiles.map(([filename, stats], i) => {
             const risk = getRiskLevel(stats.churn);
             return (
-              <div key={filename} className="flex flex-col gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <FileCode className="w-4 h-4 text-white/20 flex-shrink-0" />
-                    <span className="text-sm font-medium truncate text-white/80">{filename}</span>
+              <motion.div 
+                key={filename}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="group relative"
+              >
+                <div className="relative flex flex-col gap-4 p-6 rounded-3xl bg-bg/40 border border-border hover:border-warning/30 transition-all">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-white/5 border border-border flex items-center justify-center">
+                        <FileCode className="w-5 h-5 text-text-secondary" />
+                      </div>
+                      <span className="text-base font-medium truncate text-text-primary">{filename}</span>
+                    </div>
+                    <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest border ${risk.bg} ${risk.color} ${risk.border}`}>
+                      {risk.label}
+                    </span>
                   </div>
-                  <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter", risk.bg, risk.color)}>
-                    {risk.label}
-                  </span>
+                  
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
+                    <div className="space-y-1">
+                      <p className="text-[8px] font-mono text-text-secondary/40 uppercase tracking-widest">Code Churn</p>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className={`w-3 h-3 ${risk.color}`} />
+                        <span className="text-sm font-bold text-text-primary">{stats.churn} lines</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[8px] font-mono text-text-secondary/40 uppercase tracking-widest">Total Changes</p>
+                      <p className="text-sm font-bold text-text-primary">{stats.changes} commits</p>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${risk.color.replace('text-', 'bg-')}`} 
+                      style={{ width: `${Math.min((stats.churn / 1000) * 100, 100)}%` }} 
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-white/30 font-mono uppercase tracking-widest">
-                  <span>Churn: {stats.churn}</span>
-                  <span>Changes: {stats.changes}</span>
-                </div>
-              </div>
+              </motion.div>
             );
           })
         ) : (
-          <p className="text-sm text-white/40 text-center py-4 italic">No significant churn detected.</p>
+          <div className="flex flex-col items-center justify-center py-12 gap-4 text-center glass rounded-3xl">
+            <p className="text-sm text-text-secondary italic">No significant architectural churn detected.</p>
+          </div>
         )}
       </div>
     </div>

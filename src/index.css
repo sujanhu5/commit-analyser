@@ -5,21 +5,40 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --font-display: "Outfit", sans-serif;
-  --color-brand: #2563eb;
-  --color-brand-hover: #1d4ed8;
+  
+  --color-bg: #0B0F14;
+  --color-card: #111827;
+  --color-border: #1F2937;
+  
+  --color-success: #22C55E;
+  --color-insights: #3B82F6;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  
+  --color-text-primary: #E5E7EB;
+  --color-text-secondary: #9CA3AF;
 }
 
 @layer base {
   body {
-    @apply bg-[#050505] text-white antialiased;
+    @apply bg-bg text-text-primary antialiased;
     background-image: 
-      radial-gradient(circle at 2px 2px, rgba(255, 255, 255, 0.05) 1px, transparent 0);
-    background-size: 24px 24px;
+      linear-gradient(to right, rgba(31, 41, 55, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(31, 41, 55, 0.1) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
 }
 
+.glass {
+  @apply bg-card/60 backdrop-blur-md border border-border;
+}
+
+.glow-green { box-shadow: 0 0 20px rgba(34, 197, 94, 0.15); }
+.glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.15); }
+.glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.15); }
+
 .prose {
-  @apply text-white/70 leading-relaxed;
+  @apply text-text-secondary leading-relaxed;
 }
 
 .prose p {
@@ -27,5 +46,5 @@
 }
 
 .prose strong {
-  @apply text-orange-500 font-bold;
+  @apply text-insights font-bold;
 }
