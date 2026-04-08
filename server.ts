@@ -5,38 +5,25 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Global Error Handlers for Vercel stability
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
-});
-
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught Exception:", err);
-});
-
 const app = express();
-const PORT = 3000;
-
 app.use(express.json());
+
+// GitHub API Helper with timeout
+const github = axios.create({
+  baseURL: "https://api.github.com",
+  timeout: 8000, // 8 seconds timeout
+  headers: {
+    Accept: "application/vnd.github.v3+json",
+  },
+});
 
 // API Health Check
 app.get("/api/health", (req, res) => {
   res.json({ 
     status: "ok", 
     message: "Solaris API is operational",
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV
+    timestamp: new Date().toISOString()
   });
-});
-
-// GitHub API Helper with timeout
-const github = axios.create({
-  baseURL: "https://api.github.com",
-  timeout: 9000, // 9 seconds timeout to fit within Vercel Hobby 10s limit
-  headers: {
-    Accept: "application/vnd.github.v3+json",
-    ...(process.env.GITHUB_TOKEN ? { Authorization: `token ${process.env.GITHUB_TOKEN}` } : {}),
-  },
 });
 
 app.post("/api/analyze", async (req, res) => {
@@ -139,8 +126,8 @@ app.post("/api/analyze", async (req, res) => {
       analysis.lowestActivity = { day: sortedByCount[sortedByCount.length - 1].day, count: sortedByCount[sortedByCount.length - 1].value };
     }
 
-    // 4. Process Detailed Commits (limit to 5 for file analysis to prevent timeout on Vercel)
-    const detailedCommitsPromises = commits.slice(0, 5).map((c: any) => 
+    // 4. Process Detailed Commits (limit to 3 for Vercel stability)
+    const detailedCommitsPromises = commits.slice(0, 3).map((c: any) => 
       github.get(`/repos/${owner}/${repo}/commits/${c.sha}`, {
         headers: authHeader
       }).catch(err => {
@@ -252,8 +239,11 @@ app.use((err: any, req: any, res: any, next: any) => {
 
 export default app;
 
-if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
-  async function startServer() {
+// Only start the server if we are NOT on Vercel
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 3000;
+  
+  const startServer = async () => {
     if (process.env.NODE_ENV !== "production") {
       const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
@@ -269,10 +259,10 @@ if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
       });
     }
 
-    app.listen(PORT, "0.0.0.0", () => {
+    app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
-  }
+  };
 
   startServer();
 }
