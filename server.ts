@@ -5,10 +5,25 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Global Error Handlers for Vercel stability
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// Global Error Middleware
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Express Error:", err);
+  res.status(500).json({ error: "Internal Server Error", message: err.message });
+});
 
 // API Health Check
 app.get("/api/health", (req, res) => {
@@ -20,9 +35,10 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// GitHub API Helper
+// GitHub API Helper with timeout
 const github = axios.create({
   baseURL: "https://api.github.com",
+  timeout: 9000, // 9 seconds timeout to fit within Vercel Hobby 10s limit
   headers: {
     Accept: "application/vnd.github.v3+json",
     ...(process.env.GITHUB_TOKEN ? { Authorization: `token ${process.env.GITHUB_TOKEN}` } : {}),
@@ -118,8 +134,8 @@ app.post("/api/analyze", async (req, res) => {
       analysis.lowestActivity = { day: sortedByCount[sortedByCount.length - 1].day, count: sortedByCount[sortedByCount.length - 1].value };
     }
 
-    // 4. Process Detailed Commits (limit to 10 for file analysis to prevent timeout)
-    const detailedCommitsPromises = commits.slice(0, 10).map((c: any) => 
+    // 4. Process Detailed Commits (limit to 5 for file analysis to prevent timeout on Vercel)
+    const detailedCommitsPromises = commits.slice(0, 5).map((c: any) => 
       github.get(`/repos/${owner}/${repo}/commits/${c.sha}`, {
         headers: authHeader
       }).catch(err => {
