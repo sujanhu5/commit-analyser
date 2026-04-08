@@ -26,8 +26,19 @@ export default function App() {
       });
       
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Failed to analyze repository");
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errData = await response.json();
+          throw new Error(errData.error || "Failed to analyze repository");
+        } else {
+          const text = await response.text();
+          console.error("Non-JSON error response:", text);
+          // Check if it looks like a Vercel error page
+          if (text.includes("The page could not be found") || text.includes("404")) {
+            throw new Error("API endpoint not found. Please check Vercel deployment logs and routing configuration.");
+          }
+          throw new Error(`Server error (${response.status}): ${text.substring(0, 100)}...`);
+        }
       }
 
       const result = await response.json();

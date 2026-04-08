@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import axios from "axios";
 import dotenv from "dotenv";
@@ -10,6 +9,16 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// API Health Check
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    message: "Solaris API is operational",
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV
+  });
+});
 
 // GitHub API Helper
 const github = axios.create({
@@ -203,6 +212,7 @@ export default app;
 if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
   async function startServer() {
     if (process.env.NODE_ENV !== "production") {
+      const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa",
