@@ -19,12 +19,6 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Global Error Middleware
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error("Express Error:", err);
-  res.status(500).json({ error: "Internal Server Error", message: err.message });
-});
-
 // API Health Check
 app.get("/api/health", (req, res) => {
   res.json({ 
@@ -61,14 +55,20 @@ app.post("/api/analyze", async (req, res) => {
 
     const [_, owner, repo] = match;
 
-    // Use provided token or fallback to env
-    const authHeader = token ? { Authorization: `token ${token}` } : 
-                       (process.env.GITHUB_TOKEN ? { Authorization: `token ${process.env.GITHUB_TOKEN}` } : {});
+    // Use provided token or fallback to env (only if not empty)
+    const effectiveToken = token || process.env.GITHUB_TOKEN;
+    const authHeader = (effectiveToken && effectiveToken.trim() !== "") 
+      ? { Authorization: `token ${effectiveToken.trim()}` } 
+      : {};
 
     // 1. Fetch Repo Info
     const { data: repoInfo } = await github.get(`/repos/${owner}/${repo}`, {
       headers: authHeader
     });
+
+    if (!repoInfo) {
+      throw new Error("Repository information not found");
+    }
 
     // 2. Fetch Commits (limit to 100 for better analysis)
     const { data: commits } = await github.get(`/repos/${owner}/${repo}/commits`, {
@@ -76,14 +76,18 @@ app.post("/api/analyze", async (req, res) => {
       headers: authHeader
     });
 
+    if (!commits || !Array.isArray(commits)) {
+      throw new Error("Could not fetch commits or repository is empty");
+    }
+
     const analysis = {
-      name: repoInfo.full_name,
-      description: repoInfo.description,
+      name: repoInfo.full_name || `${owner}/${repo}`,
+      description: repoInfo.description || "No description provided",
       totalCommits: commits.length,
       contributorsCount: 0,
-      lastUpdated: repoInfo.updated_at,
+      lastUpdated: repoInfo.updated_at || new Date().toISOString(),
       filesChangedCount: 0,
-      lastCommitDate: commits[0]?.commit.author.date || "",
+      lastCommitDate: commits[0]?.commit?.author?.date || "",
       peakActivity: { day: "", count: 0 },
       lowestActivity: { day: "", count: 0 },
       commits: [] as any[],
@@ -114,8 +118,9 @@ app.post("/api/analyze", async (req, res) => {
 
     // 3. Process All Commits (for stats)
     commits.forEach((c: any) => {
-      const author = c.commit.author.name;
-      const date = new Date(c.commit.author.date).toLocaleDateString();
+      const author = c.commit?.author?.name || "Unknown";
+      const dateStr = c.commit?.author?.date;
+      const date = dateStr ? new Date(dateStr).toLocaleDateString() : "Unknown";
       
       uniqueAuthors.add(author);
       analysis.developerInsights[author] = (analysis.developerInsights[author] || 0) + 1;
@@ -229,8 +234,20 @@ app.post("/api/analyze", async (req, res) => {
     res.json(analysis);
   } catch (error: any) {
     console.error("Analysis Error:", error.response?.data || error.message);
-    res.status(500).json({ error: "Failed to analyze repository. Check URL or rate limits." });
+    const status = error.response?.status || 500;
+    const message = error.response?.data?.message || error.message || "Failed to analyze repository";
+    res.status(status).json({ error: message });
   }
+});
+
+// Global Error Middleware (MUST be after routes)
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Express Error:", err);
+  res.status(500).json({ 
+    error: "Internal Server Error", 
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
 });
 
 export default app;
