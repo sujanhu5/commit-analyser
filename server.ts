@@ -118,21 +118,28 @@ app.post("/api/analyze", async (req, res) => {
       analysis.lowestActivity = { day: sortedByCount[sortedByCount.length - 1].day, count: sortedByCount[sortedByCount.length - 1].value };
     }
 
-    // 4. Process Detailed Commits (limit to 20 for file analysis)
-    const detailedCommitsPromises = commits.slice(0, 20).map((c: any) => 
+    // 4. Process Detailed Commits (limit to 10 for file analysis to prevent timeout)
+    const detailedCommitsPromises = commits.slice(0, 10).map((c: any) => 
       github.get(`/repos/${owner}/${repo}/commits/${c.sha}`, {
         headers: authHeader
+      }).catch(err => {
+        console.error(`Failed to fetch commit ${c.sha}:`, err.message);
+        return null;
       })
     );
 
     const detailedCommitsResults = await Promise.all(detailedCommitsPromises);
 
-    detailedCommitsResults.forEach((result: any, index: number) => {
+    detailedCommitsResults.forEach((result: any) => {
+      if (!result || !result.data) return;
+      
       const c = result.data;
-      const message = c.commit.message;
-      const author = c.commit.author.name;
-      const date = c.commit.author.date;
-      const sha = c.sha;
+      if (!c.commit) return;
+
+      const message = c.commit.message || "";
+      const author = c.commit.author?.name || "Unknown";
+      const date = c.commit.author?.date || "";
+      const sha = c.sha || "";
 
       uniqueAuthors.add(author);
       analysis.developerInsights[author] = (analysis.developerInsights[author] || 0) + 1;
@@ -163,38 +170,41 @@ app.post("/api/analyze", async (req, res) => {
       }
 
       // File Analysis (Churn & Security)
-      c.files.forEach((file: any) => {
-        uniqueFiles.add(file.filename);
-        const churn = file.additions + file.deletions;
-        if (!analysis.riskyFiles[file.filename]) {
-          analysis.riskyFiles[file.filename] = { churn: 0, changes: 0 };
-        }
-        analysis.riskyFiles[file.filename].churn += churn;
-        analysis.riskyFiles[file.filename].changes += 1;
+      if (c.files && Array.isArray(c.files)) {
+        c.files.forEach((file: any) => {
+          if (!file.filename) return;
+          uniqueFiles.add(file.filename);
+          const churn = (file.additions || 0) + (file.deletions || 0);
+          if (!analysis.riskyFiles[file.filename]) {
+            analysis.riskyFiles[file.filename] = { churn: 0, changes: 0 };
+          }
+          analysis.riskyFiles[file.filename].churn += churn;
+          analysis.riskyFiles[file.filename].changes += 1;
 
-        // Simple Security Checks on patch/content
-        const patch = file.patch || "";
-        
-        // Patterns
-        if (patch.includes("eval(")) {
-          analysis.securityAlerts.push({
-            issue: "Potentially dangerous 'eval()' usage",
-            severity: "High",
-            file: file.filename,
-            fix: "Use safer alternatives like JSON.parse() or direct property access.",
-          });
-        }
+          // Simple Security Checks on patch/content
+          const patch = file.patch || "";
+          
+          // Patterns
+          if (patch.includes("eval(")) {
+            analysis.securityAlerts.push({
+              issue: "Potentially dangerous 'eval()' usage",
+              severity: "High",
+              file: file.filename,
+              fix: "Use safer alternatives like JSON.parse() or direct property access.",
+            });
+          }
 
-        const secretPattern = /(API_KEY|SECRET|PASSWORD|TOKEN|ACCESS_KEY)\s*[:=]\s*['"][a-zA-Z0-9\-_]{16,}['"]/i;
-        if (secretPattern.test(patch)) {
-          analysis.securityAlerts.push({
-            issue: "Possible hardcoded secret/token detected",
-            severity: "Critical",
-            file: file.filename,
-            fix: "Move secrets to environment variables and rotate the leaked credential immediately.",
-          });
-        }
-      });
+          const secretPattern = /(API_KEY|SECRET|PASSWORD|TOKEN|ACCESS_KEY)\s*[:=]\s*['"][a-zA-Z0-9\-_]{16,}['"]/i;
+          if (secretPattern.test(patch)) {
+            analysis.securityAlerts.push({
+              issue: "Possible hardcoded secret/token detected",
+              severity: "Critical",
+              file: file.filename,
+              fix: "Move secrets to environment variables and rotate the leaked credential immediately.",
+            });
+          }
+        });
+      }
     });
 
     analysis.contributorsCount = uniqueAuthors.size;
